@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+# output file on HPC
+test_output/
+
+# sbatch file on HPC
+*.s
+
+# data
+data/
+
+# saved model
+results/
+
+# virtual environment
+mer/
