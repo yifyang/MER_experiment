@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Meta-Experience Replay (MER)
 
 Source code for the paper "Learning to Learn without Forgetting by Maximizing Transfer and Minimizing Interference".
@@ -149,3 +150,6 @@ This repository was originally developed in Python 3.5.2 using PyTorch 0.3.1.
 # Reproducing Our Experiments 
 
 We have conducted comprehensive experiments detailed in Appendix M of our paper to make sure that our results are reproducible across runs regardless of the machine and random seed. You should be able to reproduce these experiments using the provided mer_examples.sh script.
+=======
+# MER_experiment
+>>>>>>> 85eafea55192c504547f78b8424213f1e07e405e
