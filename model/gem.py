@@ -203,6 +203,7 @@ class Net(nn.Module):
         loss.backward()
 
         # check if gradient violates constraints
+        dotp_list = [[]]  # record dotp and return
         if len(self.observed_tasks) > 1:
             # copy gradient
             store_grad(self.parameters, self.grads, self.grad_dims, t)
@@ -210,7 +211,7 @@ class Net(nn.Module):
                 else torch.LongTensor(self.observed_tasks[:-1])
             dotp = torch.mm(self.grads[:, t].unsqueeze(0),
                             self.grads.index_select(1, indx))
-            print(dotp)
+            dotp_list = dotp.tolist()
             if (dotp < 0).sum() != 0:
                 project2cone2(self.grads[:, t].unsqueeze(1),
                               self.grads.index_select(1, indx), self.margin)
@@ -219,3 +220,5 @@ class Net(nn.Module):
                                self.grad_dims)
 
         self.opt.step()
+
+        return dotp_list

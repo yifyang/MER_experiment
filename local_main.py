@@ -1,4 +1,4 @@
-### This is a modified version of main.py from https://github.com/facebookresearch/GradientEpisodicMemory 
+### This is a modified version of main.py from https://github.com/facebookresearch/GradientEpisodicMemory
 ### The most significant changes are to the arguments: 1) allowing for new models and 2) changing the default settings in some cases
 
 # Copyright 2019-present, IBM Research
@@ -21,6 +21,7 @@ import numpy as np
 import torch
 from torch.autograd import Variable
 from metrics.metrics import confusion_matrix
+
 
 # continuum iterator #########################################################
 
@@ -97,6 +98,7 @@ class Continuum:
             # return the next sample (j-th sample in task ti)
             return self.data[ti][1][j], ti, self.data[ti][2][j]
 
+
 # train handle ###############################################################
 
 
@@ -108,7 +110,7 @@ def eval_tasks(model, tasks, args):
         x = task[1]
         y = task[2]
         rt = 0
-        
+
         eval_bs = x.size(0)
 
         with torch.no_grad():  # torch 0.4+
@@ -134,12 +136,13 @@ def eval_tasks(model, tasks, args):
 def life_experience(model, continuum, x_te, args):
     result_a = []  # accuracy
     result_t = []  # number of task
+    result_dotp = []
 
     current_task = 0
     time_start = time.time()
 
     for (i, (x, t, y)) in enumerate(continuum):
-        if(((i % args.log_every) == 0) or (t != current_task)):
+        if (((i % args.log_every) == 0) or (t != current_task)):
             result_a.append(eval_tasks(model, x_te, args))
             result_t.append(current_task)
             current_task = t
@@ -152,7 +155,8 @@ def life_experience(model, continuum, x_te, args):
             v_y = v_y.cuda()
 
         model.train()
-        model.observe(Variable(v_x), t, Variable(v_y))
+        temp = model.observe(Variable(v_x), t, Variable(v_y))
+        result_dotp.append(temp[0])
 
     result_a.append(eval_tasks(model, x_te, args))
     result_t.append(current_task)
@@ -160,41 +164,42 @@ def life_experience(model, continuum, x_te, args):
     time_end = time.time()
     time_spent = time_end - time_start
 
-    return torch.Tensor(result_t), torch.Tensor(result_a), time_spent
+    return torch.Tensor(result_t), torch.Tensor(result_a), torch.Tensor(result_dotp), time_spent
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Continuum learning')
 
     # model details
-    parser.add_argument('--model', type=str, default='single',
+    parser.add_argument('--model', type=str, default='gem',
                         help='model to train')
     parser.add_argument('--n_hiddens', type=int, default=100,
                         help='number of hidden neurons at each layer')
     parser.add_argument('--n_layers', type=int, default=2,
                         help='number of hidden layers')
-    parser.add_argument('--finetune', default='yes', type=str,help='whether to initialize nets in indep. nets')
-    
+    parser.add_argument('--finetune', default='yes', type=str, help='whether to initialize nets in indep. nets')
+
     # optimizer parameters influencing all models
     parser.add_argument('--n_epochs', type=int, default=1,
                         help='Number of epochs per task')
     parser.add_argument('--batch_size', type=int, default=1,
                         help='the amount of items received by the algorithm at one time (set to 1 across all experiments). Variable name is from GEM project.')
-    parser.add_argument('--lr', type=float, default=1e-3,
+    parser.add_argument('--lr', type=float, default=0.01,
                         help='learning rate')
 
     # memory parameters for GEM baselines
-    parser.add_argument('--n_memories', type=int, default=0,
+    parser.add_argument('--n_memories', type=int, default=25,
                         help='number of memories per task')
-    parser.add_argument('--memory_strength', default=0, type=float,
+    parser.add_argument('--memory_strength', default=1.0, type=float,
                         help='memory strength (meaning depends on memory)')
 
-    # parameters specific to models in https://openreview.net/pdf?id=B1gTShAct7 
-    
-    parser.add_argument('--memories', type=int, default=5120, help='number of total memories stored in a reservoir sampling based buffer')
+    # parameters specific to models in https://openreview.net/pdf?id=B1gTShAct7
+
+    parser.add_argument('--memories', type=int, default=5120,
+                        help='number of total memories stored in a reservoir sampling based buffer')
 
     parser.add_argument('--gamma', type=float, default=1.0,
-                        help='gamma learning rate parameter') #gating net lr in roe 
+                        help='gamma learning rate parameter')  # gating net lr in roe
 
     parser.add_argument('--batches_per_example', type=float, default=1,
                         help='the number of batch per incoming example')
@@ -206,8 +211,8 @@ if __name__ == "__main__":
                         help='The batch size for experience replay. Denoted as k-1 in the paper.')
 
     parser.add_argument('--beta', type=float, default=1.0,
-                        help='beta learning rate parameter') # exploration factor in roe
-    
+                        help='beta learning rate parameter')  # exploration factor in roe
+
     # experiment parameters
     parser.add_argument('--cuda', type=str, default='no',
                         help='Use GPU?')
@@ -223,7 +228,7 @@ if __name__ == "__main__":
                         help='path where data is located')
     parser.add_argument('--data_file', default='mnist_permutations.pt',
                         help='data file')
-    parser.add_argument('--samples_per_task', type=int, default=-1,
+    parser.add_argument('--samples_per_task', type=int, default=1000,
                         help='training samples per task (all if negative)')
     parser.add_argument('--shuffle_tasks', type=str, default='no',
                         help='present tasks in order')
@@ -239,7 +244,7 @@ if __name__ == "__main__":
     # unique identifier
     uid = uuid.uuid4().hex
 
-    # initialize seeds    
+    # initialize seeds
     torch.backends.cudnn.enabled = False
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -264,10 +269,10 @@ if __name__ == "__main__":
         try:
             model.cuda()
         except:
-            pass 
+            pass
 
-    # run model on continuum
-    result_t, result_a, spent_time = life_experience(
+            # run model on continuum
+    result_t, result_a, result_dotp, spent_time = life_experience(
         model, continuum, x_te, args)
 
     # prepare saving path and file name
@@ -286,5 +291,5 @@ if __name__ == "__main__":
     print(fname + ': ' + one_liner + ' # ' + str(spent_time))
 
     # save all results in binary file
-    torch.save((result_t, result_a, model.state_dict(),
+    torch.save((result_t, result_a, result_dotp, model.state_dict(),
                 stats, one_liner, args), fname + '.pt')
