@@ -15,3 +15,6 @@ results/
 
 # virtual environment
 mer/
+
+# local_test
+local_test.sh

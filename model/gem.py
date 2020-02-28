@@ -210,6 +210,7 @@ class Net(nn.Module):
                 else torch.LongTensor(self.observed_tasks[:-1])
             dotp = torch.mm(self.grads[:, t].unsqueeze(0),
                             self.grads.index_select(1, indx))
+            print(dotp)
             if (dotp < 0).sum() != 0:
                 project2cone2(self.grads[:, t].unsqueeze(1),
                               self.grads.index_select(1, indx), self.margin)

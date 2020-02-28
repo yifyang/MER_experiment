@@ -249,8 +249,10 @@ if __name__ == "__main__":
         torch.cuda.manual_seed_all(args.seed)
 
     # load data
+    print("Loading Data")
     x_tr, x_te, n_inputs, n_outputs, n_tasks = load_datasets(args)
     n_outputs = n_outputs.item()  # outputs should not be a tensor, otherwise "TypeError: expected Float (got Long)"
+    print("Data has been loaded")
 
     # set up continuum
     continuum = Continuum(x_tr, args)
