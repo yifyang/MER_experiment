@@ -101,23 +101,13 @@ For just MNIST Many Permutations (21 GB) execute:
 
 ```python get_data.py manypermutations```
 
-# Getting Started
+# Making the plot
 
-In mer_examples.sh see examples of how to run variants of MER from the paper and baseline models from the experiments. We make sure first that this script is excutable:
+Run the juputer notebook with the torch data and ipynb file in the plot directory.
 
-```chmod +x mer_examples.sh```
+The training was based on 20 tasks of permuted MNIST. And there are 3000 samples for each task.
 
-Now, executing the following command leads to running a full suite of experiments with a random seed of 0:
-
-```
-./mer_examples.sh "0"
-```
-
-Within the file you can see examples of how to run models from our experiments on each datasets and memory size setting. For instance, we can execute MER from Algorithm 1 in the paper (meralg1) on MNIST Rotations with 5120 memories using the following commands:
-```
-export ROT="--n_layers 2 --n_hiddens 100 --data_path data/ --save_path results/ --batch_size 1 --log_every 100 --samples_per_task 1000 --data_file mnist_rotations.pt --cuda no --seed 0"
-python3 main.py $ROT --model meralg1 --lr 0.03 --beta 0.03 --gamma 1.0 --memories 5120 --replay_batch_size 100 --batches_per_example 10
-```
+There are two ways to do the comparison. The first is to compare two tasks directly. The second one is to compare a certain task with all the following tasks.
 
 # Available Models
 
@@ -142,14 +132,3 @@ In the model/ directory we have provided various models that were used for exper
 - Meta-Experience Replay Algorithm 6 (meralg6)
 
 - Meta-Experience Replay Algorithm 7 (meralg7)
-
-# System Requirements
-
-This repository was originally developed in Python 3.5.2 using PyTorch 0.3.1. 
-
-# Reproducing Our Experiments 
-
-We have conducted comprehensive experiments detailed in Appendix M of our paper to make sure that our results are reproducible across runs regardless of the machine and random seed. You should be able to reproduce these experiments using the provided mer_examples.sh script.
-=======
-# MER_experiment
->>>>>>> 85eafea55192c504547f78b8424213f1e07e405e
