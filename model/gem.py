@@ -212,7 +212,7 @@ class Net(nn.Module):
             dotp = torch.mm(self.grads[:, t].unsqueeze(0),
                             self.grads.index_select(1, indx))
             dotp_list = dotp.tolist()
-            dotp_list[0] += [0] * (19 - len(dotp_list))
+            dotp_list[0] += [0] * (19 - len(dotp_list[0]))
             if (dotp < 0).sum() != 0:
                 project2cone2(self.grads[:, t].unsqueeze(1),
                               self.grads.index_select(1, indx), self.margin)
