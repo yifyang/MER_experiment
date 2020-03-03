@@ -37,7 +37,6 @@ def load_datasets(args):
 
 
 class Continuum:
-    # 构造数据集，根据batch和都个任务打散
     # random samples from the buffer to be trained alongside the current example
     def __init__(self, data, args):
         self.data = data

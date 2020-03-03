@@ -114,12 +114,13 @@ class Net(nn.Module):
         self.opt = optim.SGD(self.parameters(), args.lr)
 
         self.n_memories = args.n_memories
+        self.n_tasks = n_tasks
         self.gpu = args.cuda
 
         # allocate episodic memory
         self.memory_data = torch.FloatTensor(
-            n_tasks, self.n_memories, n_inputs)
-        self.memory_labs = torch.LongTensor(n_tasks, self.n_memories)
+            self.n_tasks, self.n_memories, n_inputs)
+        self.memory_labs = torch.LongTensor(self.n_tasks, self.n_memories)
         if args.cuda:
             self.memory_data = self.memory_data.cuda()
             self.memory_labs = self.memory_labs.cuda()
@@ -203,7 +204,7 @@ class Net(nn.Module):
         loss.backward()
 
         # check if gradient violates constraints
-        dotp_list = [[0] * 19]  # record dotp and return
+        dotp_list = [[0] * (self.n_tasks-1)]  # record dotp and return
         if len(self.observed_tasks) > 1:
             # copy gradient
             store_grad(self.parameters, self.grads, self.grad_dims, t)
@@ -212,7 +213,7 @@ class Net(nn.Module):
             dotp = torch.mm(self.grads[:, t].unsqueeze(0),
                             self.grads.index_select(1, indx))
             dotp_list = dotp.tolist()
-            dotp_list[0] += [0] * (19 - len(dotp_list[0]))
+            dotp_list[0] += [0] * ((self.n_tasks-1) - len(dotp_list[0]))
             if (dotp < 0).sum() != 0:
                 project2cone2(self.grads[:, t].unsqueeze(1),
                               self.grads.index_select(1, indx), self.margin)
