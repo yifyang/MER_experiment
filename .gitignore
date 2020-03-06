@@ -7,8 +7,8 @@ test_output/
 # sbatch file on HPC
 *.s
 
-# data
-data/
+# data & visualization
+data/raw/
 
 # saved model
 results/
