@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Meta-Experience Replay (MER)
 
 Source code for the paper "Learning to Learn without Forgetting by Maximizing Transfer and Minimizing Interference".
@@ -106,6 +105,8 @@ For just MNIST Many Permutations (21 GB) execute:
 Run the juputer notebook with the torch data and ipynb file in the plot directory.
 
 The training was based on 20 tasks of permuted MNIST. And there are 3000 samples for each task.
+Another dataset used is Cifar100 and there are 2500 samples in each task.
+There is a Image_show file to display the image in each task if you want to figure out the differences between different tasks.
 
 There are two ways to do the comparison. The first is to compare two tasks directly. The second one is to compare a certain task with all the following tasks.
 
