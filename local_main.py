@@ -155,7 +155,7 @@ def life_experience(model, continuum, x_te, args):
 
         model.train()
         temp = model.observe(Variable(v_x), t, Variable(v_y))
-        result_dotp.append(temp[0])
+        result_dotp.append(temp)
 
     result_a.append(eval_tasks(model, x_te, args))
     result_t.append(current_task)
@@ -225,7 +225,7 @@ if __name__ == "__main__":
     # data parameters
     parser.add_argument('--data_path', default='data/',
                         help='path where data is located')
-    parser.add_argument('--data_file', default='mnist_permutations.pt',
+    parser.add_argument('--data_file', default='cifar100_20.pt',
                         help='data file')
     parser.add_argument('--samples_per_task', type=int, default=1000,
                         help='training samples per task (all if negative)')
