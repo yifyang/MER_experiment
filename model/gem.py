@@ -166,6 +166,9 @@ class Net(nn.Module):
                 self.grads_layer.append(torch.Tensor(sum(self.grad_dims_layer[layer_num]), n_tasks))
                 layer_num += 1
 
+            if args.cuda:
+                self.grads_layer = self.grads_layer.cuda()
+
         if args.cuda:
             self.grads = self.grads.cuda()
 
