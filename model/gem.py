@@ -125,7 +125,8 @@ class Net(nn.Module):
         nl, nh = args.n_layers, args.n_hiddens
         self.margin = args.memory_strength
         self.is_cifar = (args.data_file == 'cifar100.pt' or
-                         args.data_file == 'cifar100_20.pt')
+                         args.data_file == 'cifar100_20.pt' or
+                         args.data_file == 'cifar100_20_o.pt')
         if self.is_cifar:
             self.net = ResNet18(n_outputs)
         else:
@@ -230,8 +231,9 @@ class Net(nn.Module):
                 ptloss.backward()
                 store_grad(self.parameters, self.grads, self.grad_dims,
                            past_task)
-                store_layer_grad(self.layers, self.grads_layer, self.grad_dims_layer,
-                                 past_task)
+                if self.is_cifar:
+                    store_layer_grad(self.layers, self.grads_layer, self.grad_dims_layer,
+                                    past_task)
 
         # now compute the grad on the current minibatch
         self.zero_grad()
@@ -246,21 +248,22 @@ class Net(nn.Module):
         if len(self.observed_tasks) > 1:
             # copy gradient
             store_grad(self.parameters, self.grads, self.grad_dims, t)
-            store_layer_grad(self.layers, self.grads_layer, self.grad_dims_layer, t)
+            if self.is_cifar:
+                store_layer_grad(self.layers, self.grads_layer, self.grad_dims_layer, t)
             indx = torch.cuda.LongTensor(self.observed_tasks[:-1]) if self.gpu \
                 else torch.LongTensor(self.observed_tasks[:-1])
             dotp = torch.mm(self.grads[:, t].unsqueeze(0),
                             self.grads.index_select(1, indx))
-            dotp_layers = []
-            if t > 1:
-                pass
-            for layer_num in range(len(self.layers)):
-                dotp_layer_temp = torch.mm(self.grads_layer[layer_num][:, t].unsqueeze(0),
-                            self.grads_layer[layer_num].index_select(1, indx)).tolist()[0]
-                dotp_layer_temp += [0] * ((self.n_tasks-1) - len(dotp_layer_temp))
-                dotp_layers.append(dotp_layer_temp)
-            dotp_list = dotp.tolist()
-            dotp_list[0] += [0] * ((self.n_tasks-1) - len(dotp_list[0]))
+            if self.is_cifar:
+                dotp_layers = []
+                for layer_num in range(len(self.layers)):
+                    dotp_layer_temp = torch.mm(self.grads_layer[layer_num][:, t].unsqueeze(0),
+                                self.grads_layer[layer_num].index_select(1, indx)).tolist()[0]
+                    dotp_layer_temp += [0] * ((self.n_tasks-1) - len(dotp_layer_temp))
+                    dotp_layers.append(dotp_layer_temp)
+            else:
+                dotp_list = dotp.tolist()
+                dotp_list[0] += [0] * ((self.n_tasks-1) - len(dotp_list[0]))
             if (dotp < 0).sum() != 0:
                 project2cone2(self.grads[:, t].unsqueeze(1),
                               self.grads.index_select(1, indx), self.margin)
