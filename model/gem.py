@@ -268,7 +268,7 @@ class Net(nn.Module):
 
         # check if gradient violates constraints
         dotp_list = [[0] * (self.n_tasks-1)]  # record dotp and return
-        dotp_layers =[[0] * (self.n_tasks-1)] * 4
+        dotp_layers =[[0] * (self.n_tasks-1)] * len(self.grads_layer)
         if len(self.observed_tasks) > 1:
             # copy gradient
             store_grad(self.parameters, self.grads, self.grad_dims, t)
