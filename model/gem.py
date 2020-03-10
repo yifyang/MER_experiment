@@ -52,7 +52,7 @@ def store_grad(pp, grads, grad_dims, tid):
         cnt += 1
 
 
-def store_layer_grad(layers, grads_layer, grad_dims_layer, tid):
+def store_layer_grad(layers, grads_layer, grad_dims_layer, tid, is_cifar):
     """
         This stores parameter gradients at each layers of past tasks.
         layers: layers in neural network
@@ -60,18 +60,29 @@ def store_layer_grad(layers, grads_layer, grad_dims_layer, tid):
         grad_dims_layer: list with number of parameters per layers
         tid: task id
     """
-    layer_num = 0
-    for layer in layers:
-        grads_layer[layer_num][:, tid].fill_(0.0)
-        cnt = 0
-        for param in layer.parameters():
+    if is_cifar:
+        layer_num = 0
+        for layer in layers:
+            grads_layer[layer_num][:, tid].fill_(0.0)
+            cnt = 0
+            for param in layer.parameters():
+                if param.grad is not None:
+                    beg = 0 if cnt == 0 else sum(grad_dims_layer[layer_num][:cnt])
+                    en = sum(grad_dims_layer[layer_num][:cnt + 1])
+                    grads_layer[layer_num][beg: en, tid].copy_(param.grad.data.view(-1))
+                cnt += 1
+            layer_num += 1
+    else:
+        layer_num = 0
+        for param in layers():
+            grads_layer[layer_num][:, tid].fill_(0.0)
+            cnt = 0
             if param.grad is not None:
                 beg = 0 if cnt == 0 else sum(grad_dims_layer[layer_num][:cnt])
                 en = sum(grad_dims_layer[layer_num][:cnt + 1])
                 grads_layer[layer_num][beg: en, tid].copy_(param.grad.data.view(-1))
             cnt += 1
-        layer_num += 1
-
+            layer_num += 1
 
 
 def overwrite_grad(pp, newgrad, grad_dims):
@@ -155,14 +166,26 @@ class Net(nn.Module):
             self.grad_dims.append(param.data.numel())
         self.grads = torch.Tensor(sum(self.grad_dims), n_tasks)
         if self.is_cifar:
-            self.layers = [self.net.layer1, self.net.layer2, self.net.layer3, self.net.layer4]
+            layers = [self.net.layer1, self.net.layer2, self.net.layer3, self.net.layer4]
+            self.for_layer = layers
             self.grad_dims_layer = []
             layer_num = 0
             self.grads_layer = []
-            for layer in self.layers:
+            for layer in layers:
                 self.grad_dims_layer.append([])
                 for param in layer.parameters():
                     self.grad_dims_layer[layer_num].append(param.data.numel())
+                self.grads_layer.append(torch.Tensor(sum(self.grad_dims_layer[layer_num]), n_tasks))
+                if args.cuda:
+                    self.grads_layer[-1] = self.grads_layer[-1].cuda()
+                layer_num += 1
+        else:
+            self.for_layer = self.parameters
+            self.grad_dims_layer = []
+            layer_num = 0
+            self.grads_layer = []
+            for param in self.parameters():
+                self.grad_dims_layer.append([param.data.numel()])
                 self.grads_layer.append(torch.Tensor(sum(self.grad_dims_layer[layer_num]), n_tasks))
                 if args.cuda:
                     self.grads_layer[-1] = self.grads_layer[-1].cuda()
@@ -233,9 +256,8 @@ class Net(nn.Module):
                 ptloss.backward()
                 store_grad(self.parameters, self.grads, self.grad_dims,
                            past_task)
-                if self.is_cifar:
-                    store_layer_grad(self.layers, self.grads_layer, self.grad_dims_layer,
-                                    past_task)
+                store_layer_grad(self.for_layer, self.grads_layer,
+                                 self.grad_dims_layer, past_task, self.is_cifar)
 
         # now compute the grad on the current minibatch
         self.zero_grad()
@@ -250,22 +272,21 @@ class Net(nn.Module):
         if len(self.observed_tasks) > 1:
             # copy gradient
             store_grad(self.parameters, self.grads, self.grad_dims, t)
-            if self.is_cifar:
-                store_layer_grad(self.layers, self.grads_layer, self.grad_dims_layer, t)
+            store_layer_grad(self.for_layer, self.grads_layer,
+                             self.grad_dims_layer, t, self.is_cifar)
+
             indx = torch.cuda.LongTensor(self.observed_tasks[:-1]) if self.gpu \
                 else torch.LongTensor(self.observed_tasks[:-1])
             dotp = torch.mm(self.grads[:, t].unsqueeze(0),
                             self.grads.index_select(1, indx))
-            if self.is_cifar:
-                dotp_layers = []
-                for layer_num in range(len(self.layers)):
-                    dotp_layer_temp = torch.mm(self.grads_layer[layer_num][:, t].unsqueeze(0),
-                                self.grads_layer[layer_num].index_select(1, indx)).tolist()[0]
-                    dotp_layer_temp += [0] * ((self.n_tasks-1) - len(dotp_layer_temp))
-                    dotp_layers.append(dotp_layer_temp)
-            else:
-                dotp_list = dotp.tolist()
-                dotp_list[0] += [0] * ((self.n_tasks-1) - len(dotp_list[0]))
+
+            dotp_layers = []
+            for layer_num in range(len(self.grads_layer)):
+                dotp_layer_temp = torch.mm(self.grads_layer[layer_num][:, t].unsqueeze(0),
+                            self.grads_layer[layer_num].index_select(1, indx)).tolist()[0]
+                dotp_layer_temp += [0] * ((self.n_tasks-1) - len(dotp_layer_temp))
+                dotp_layers.append(dotp_layer_temp)
+
             if (dotp < 0).sum() != 0:
                 project2cone2(self.grads[:, t].unsqueeze(1),
                               self.grads.index_select(1, indx), self.margin)
