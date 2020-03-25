@@ -282,10 +282,20 @@ class Net(nn.Module):
 
             dotp_layers = []
             for layer_num in range(len(self.grads_layer)):
+                dotp_layer_temp = []
+                for pre_task in indx:
+                    dotp_layer_temp.append(
+                        torch.cosine_similarity(self.grads_layer[layer_num][:, t],
+                                                self.grads_layer[layer_num][:, pre_task],
+                                                dim=0).item())
+                dotp_layer_temp += [0] * ((self.n_tasks - 1) - len(dotp_layer_temp))
+                dotp_layers.append(dotp_layer_temp)
+                """
                 dotp_layer_temp = torch.mm(self.grads_layer[layer_num][:, t].unsqueeze(0),
                             self.grads_layer[layer_num].index_select(1, indx)).tolist()[0]
                 dotp_layer_temp += [0] * ((self.n_tasks-1) - len(dotp_layer_temp))
                 dotp_layers.append(dotp_layer_temp)
+                """
 
             if (dotp < 0).sum() != 0:
                 project2cone2(self.grads[:, t].unsqueeze(1),
