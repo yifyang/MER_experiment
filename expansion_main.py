@@ -135,9 +135,11 @@ def eval_tasks(model, tasks, args):
 def life_experience(model, continuum, x_te, args):
     result_a = []  # accuracy
     result_t = []  # number of task
-    result_dotp = []
+    result_cos = []
 
     current_task = 0
+    batch_per_task = int(args.samples_per_task / args.batch_size)
+
     time_start = time.time()
 
     for (i, (x, t, y)) in enumerate(continuum):
@@ -145,6 +147,12 @@ def life_experience(model, continuum, x_te, args):
             result_a.append(eval_tasks(model, x_te, args))
             result_t.append(current_task)
             current_task = t
+
+        if (i == batch_per_task * t + 0.05 * batch_per_task) and t > 0:
+            pre_cos = torch.tensor(result_cos[int(i-0.05*batch_per_task): ])
+            if args.cuda:
+                pre_cos = pre_cos.cuda()
+            model.expand(pre_cos, t)
 
         v_x = x.view(x.size(0), -1)
         v_y = y.long()
@@ -155,7 +163,7 @@ def life_experience(model, continuum, x_te, args):
 
         model.train()
         temp = model.observe(Variable(v_x), t, Variable(v_y))
-        result_dotp.append(temp)
+        result_cos.append(temp)
 
     result_a.append(eval_tasks(model, x_te, args))
     result_t.append(current_task)
@@ -163,14 +171,14 @@ def life_experience(model, continuum, x_te, args):
     time_end = time.time()
     time_spent = time_end - time_start
 
-    return torch.Tensor(result_t), torch.Tensor(result_a), torch.Tensor(result_dotp), time_spent
+    return torch.Tensor(result_t), torch.Tensor(result_a), torch.Tensor(result_cos), time_spent
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Continuum learning')
 
     # model details
-    parser.add_argument('--model', type=str, default='gem',
+    parser.add_argument('--model', type=str, default='expansion',
                         help='model to train')
     parser.add_argument('--n_hiddens', type=int, default=100,
                         help='number of hidden neurons at each layer')
@@ -271,7 +279,7 @@ if __name__ == "__main__":
             pass
 
             # run model on continuum
-    result_t, result_a, result_dotp, spent_time = life_experience(
+    result_t, result_a, result_cos, spent_time = life_experience(
         model, continuum, x_te, args)
 
     # prepare saving path and file name
@@ -290,5 +298,5 @@ if __name__ == "__main__":
     print(fname + ': ' + one_liner + ' # ' + str(spent_time))
 
     # save all results in binary file
-    torch.save((result_t, result_a, result_dotp, model.state_dict(),
+    torch.save((result_t, result_a, result_cos, model.state_dict(),
                 stats, one_liner, args), fname + '.pt')
