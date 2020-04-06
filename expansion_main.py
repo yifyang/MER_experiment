@@ -36,6 +36,14 @@ def load_datasets(args):
     return d_tr, d_te, n_inputs, n_outputs + 1, len(d_tr)
 
 
+def add_list(list1, list2):
+    for i in range(len(list1)):
+        for j in range(len(list1[i])):
+            list1[i][j] += list2[i][j]
+
+    return list1
+
+
 class Continuum:
     # random samples from the buffer to be trained alongside the current example
     def __init__(self, data, args):
@@ -135,24 +143,31 @@ def eval_tasks(model, tasks, args):
 def life_experience(model, continuum, x_te, args):
     result_a = []  # accuracy
     result_t = []  # number of task
-    result_cos = []
+    cos_layer = []
+    cos_weight = []
 
     current_task = 0
     batch_per_task = int(args.samples_per_task / args.batch_size)
+    observe_batch = int(0.05 * batch_per_task)
+    observe = 1
 
     time_start = time.time()
 
     for (i, (x, t, y)) in enumerate(continuum):
-        if (((i % args.log_every) == 0) or (t != current_task)):
+        if t != current_task:
             result_a.append(eval_tasks(model, x_te, args))
             result_t.append(current_task)
+            cos_weight = []
+            cos_layer = []
             current_task = t
+            observe = 1
 
-        if (i == batch_per_task * t + 0.05 * batch_per_task) and t > 0:
-            pre_cos = torch.tensor(result_cos[int(i-0.05*batch_per_task): ])
+        if (i == batch_per_task * t + observe_batch) and t > 0:
+            cos_layer = torch.tensor(cos_layer)
             if args.cuda:
-                pre_cos = pre_cos.cuda()
-            model.expand(pre_cos, t)
+                cos_layer = cos_layer.cuda()
+            model.expand(cos_layer, cos_weight, t, args)
+            observe = 0
 
         v_x = x.view(x.size(0), -1)
         v_y = y.long()
@@ -161,9 +176,17 @@ def life_experience(model, continuum, x_te, args):
             v_x = v_x.cuda()
             v_y = v_y.cuda()
 
-        model.train()
-        temp = model.observe(Variable(v_x), t, Variable(v_y))
-        result_cos.append(temp)
+        if observe and t > 0:
+            model.train()
+            temp_layer, temp_weight = model.observe(Variable(v_x), t, Variable(v_y))
+            cos_layer.append(temp_layer)
+            if cos_weight == []:
+                cos_weight = temp_weight
+            else:
+                cos_weight = add_list(cos_weight, temp_weight)
+        else:
+            model.train()
+            model.update(Variable(v_x), t, Variable(v_y))
 
     result_a.append(eval_tasks(model, x_te, args))
     result_t.append(current_task)
@@ -171,7 +194,7 @@ def life_experience(model, continuum, x_te, args):
     time_end = time.time()
     time_spent = time_end - time_start
 
-    return torch.Tensor(result_t), torch.Tensor(result_a), torch.Tensor(result_cos), time_spent
+    return torch.Tensor(result_t), torch.Tensor(result_a), time_spent
 
 
 if __name__ == "__main__":
@@ -235,7 +258,7 @@ if __name__ == "__main__":
                         help='path where data is located')
     parser.add_argument('--data_file', default='mnist_permutations.pt',
                         help='data file')
-    parser.add_argument('--samples_per_task', type=int, default=1000,
+    parser.add_argument('--samples_per_task', type=int, default=100,
                         help='training samples per task (all if negative)')
     parser.add_argument('--shuffle_tasks', type=str, default='no',
                         help='present tasks in order')
